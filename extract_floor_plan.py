@@ -1461,17 +1461,27 @@ def refine_room_dimensions_with_vision(
 
     names_list = ", ".join(room_names)
     prompt = (
-        f"This is a floor plan image. The following rooms have been detected: {names_list}.\n"
-        "For each room, find and read the dimension text printed inside the room boundary. "
-        "Dimensions may appear in formats like: '9.4 x 7.3', '9'4\" x 7'3\"', '11.6x8.3', etc.\n"
-        "Return ONLY valid JSON in this exact format:\n"
-        '{"rooms": [{"name": "<room_name>", "length_ft": <float>, "width_ft": <float>}]}\n'
-        "Rules:\n"
-        "- name must exactly match one of the detected rooms listed above\n"
-        "- Convert feet-inches to decimal feet (e.g. 9'4\" = 9.33)\n"
-        "- Only include rooms where you can clearly read dimension text\n"
-        "- Do not guess or hallucinate dimensions\n"
-        "- If no dimensions are visible for a room, omit it from the list"
+        f"You are reading a floor plan image. Detected rooms: {names_list}.\n\n"
+        "TASK: For EACH room listed above, carefully read the dimension text printed INSIDE that room.\n\n"
+        "DIMENSION FORMATS you may see:\n"
+        "- Decimal feet: '9.4 x 7.3' or '9.4x7.3'\n"
+        "- Feet-inches: '9\\'4\" x 7\\'3\"' or '9\\'4 x 7\\'3' or '12\\'6\" x 11\\'6\"'\n"
+        "- Sometimes written as: '9-4 x 7-3' or similar\n\n"
+        "CONVERSION EXAMPLES:\n"
+        "- '9\\'4\"' means 9 feet 4 inches = 9 + (4/12) = 9.33 feet\n"
+        "- '7\\'3\"' means 7 feet 3 inches = 7 + (3/12) = 7.25 feet\n"
+        "- '12\\'6\"' means 12 feet 6 inches = 12.5 feet\n\n"
+        "RESPONSE FORMAT (ONLY return this JSON, nothing else):\n"
+        '{"rooms": [{"name": "KITCHEN", "length_ft": 9.33, "width_ft": 7.25}, {"name": "BEDROOM", "length_ft": 12.5, "width_ft": 11.5}]}\n\n'
+        "RULES:\n"
+        "1. Read EXACTLY what you see in the image - no guessing\n"
+        "2. Return rooms in the order: KITCHEN, BEDROOM(s), LIVING, BATHROOM, DINING, BALCONY, etc.\n"
+        "3. For each room, identify the WIDTH and LENGTH dimensions shown\n"
+        "4. Convert ALL to decimal feet (feet + inches/12)\n"
+        "5. Only include rooms where you can CLEARLY see dimension text\n"
+        "6. Return empty rooms array if you cannot read any dimensions\n"
+        "7. Do NOT include rooms not in the detected list\n"
+        "8. Response MUST be valid JSON only"
     )
 
     try:
@@ -1489,11 +1499,18 @@ def refine_room_dimensions_with_vision(
             config=types.GenerateContentConfig(temperature=0.0),
         )
         raw = (response.text or "").strip()
+        # Debug: log what Gemini returned
+        import sys
+        print(f"[DEBUG] Gemini response: {raw[:200]}", file=sys.stderr)
         parsed = _safe_json_load(raw)
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"[DEBUG] Gemini error: {e}", file=sys.stderr)
         return {"attempted": 1, "updated": 0}
 
     if not parsed or not isinstance(parsed.get("rooms"), list):
+        import sys
+        print(f"[DEBUG] Failed to parse JSON or no rooms: {parsed}", file=sys.stderr)
         return {"attempted": 1, "updated": 0}
 
     # Build lookup by normalized room name
