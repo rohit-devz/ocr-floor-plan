@@ -1,0 +1,21 @@
+# Core extraction
+numpy
+opencv-python
+pytesseract
+
+# Optional local OCR engines
+easyocr
+paddleocr
+
+# Google/Gemini extractors
+google-cloud-vision
+google-auth
+google-genai
+google-generativeai
+
+# Optional AI-assisted refinement in extract_floor_plan.py
+dspy
+
+# Optional rendering helpers used by backend_functions.py
+cairosvg
+matplotlib
