@@ -1,8 +1,13 @@
 import argparse
+import json
+import os
 import re
+import sys
 
 import cv2
 import pytesseract
+from PIL import Image
+from utils import organize_floor_data
 
 ROOM_HINTS = [
     "KITCHEN",
@@ -63,6 +68,7 @@ def build_variants(bgr):
 
 
 def extract_best_text(image_path: str) -> str:
+    print("**********1**********")
     bgr = cv2.imread(image_path)
     if bgr is None:
         raise FileNotFoundError(f"Could not read image: {image_path}")
@@ -80,17 +86,54 @@ def extract_best_text(image_path: str) -> str:
                 best_score = sc
                 best_text = txt
 
+    data = organize_floor_data(best_text)
+    for room in data.get("rooms", []):
+        if room.get("name") == "KITCHEN":
+            name = room.get("name")
+            label = room.get("raw_label")
+            dims = room.get("dimensions")
+
+            print(label, dims)
+
     return best_text
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Fast, higher-accuracy OCR for floor-plan text")
-    parser.add_argument("--image", default="C1.jpg", help="Input image path")
-    args = parser.parse_args()
+def image_to_text(image_path):
+    """
+    Extracts text from an image using Tesseract OCR.
+    :param image_path: Path to the image file
+    :return: Extracted text as a string
+    """
+    # Validate file existence
+    if not os.path.isfile(image_path):
+        raise FileNotFoundError(f"File not found: {image_path}")
 
-    text = extract_best_text(args.image)
-    print("Extracted Text:\n", text)
+    try:
+        # Open the image
+        img = Image.open(image_path)
+        print("**********2**********")
+
+        # Extract text
+        text = pytesseract.image_to_string(img)
+        data = organize_floor_data(text)
+
+        # print(data["unit"])  # print unit
+        # print(data["rooms"][1]["name"])  # print all rooms
+
+        for room in data.get("rooms", []):
+            if room.get("name") == "KITCHEN":
+                name = room.get("name")
+                label = room.get("raw_label")
+                dims = room.get("dimensions")
+
+                print(label, dims)
+
+        return text.strip()
+
+    except Exception as e:
+        raise RuntimeError(f"Error processing image: {e}")
 
 
-if __name__ == "__main__":
-    main()
+# text = extract_best_text(args.image)
+# result = organize_floor_data(results["test_py_result"], results["test2_py_result"])
+# extracted_text = image_to_text(image_path)
