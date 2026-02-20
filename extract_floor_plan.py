@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
+
+OCR_DIR = Path(__file__).resolve().parent / "ocr"
+if str(OCR_DIR) not in sys.path:
+    sys.path.insert(0, str(OCR_DIR))
+
+from extract import extract_best_text, image_to_text  # type: ignore  # noqa: E402
+from utils import organize_floor_data  # type: ignore  # noqa: E402
 
 DEFAULT_CEILING_MM = 3048
 DEFAULT_WALL_THICKNESS_MM = 150
@@ -16,21 +25,6 @@ DEFAULT_DOOR_HEIGHT_MM = 2133
 DEFAULT_WINDOW_HEIGHT_MM = 1219
 DEFAULT_WINDOW_SILL_MM = 914
 DEFAULT_MM_PER_PX = 5.0
-
-ROOM_KEYWORDS = [
-    "BEDROOM",
-    "KITCHEN",
-    "TOILET",
-    "DINING",
-    "DRAWING",
-    "LIVING",
-    "DRESS",
-    "BALCONY",
-    "UTILITY",
-    "FOYER",
-    "SERVANT",
-    "DRG",
-]
 
 FIXTURE_KEYWORDS = {
     "SINK": "sink",
@@ -167,201 +161,64 @@ def detect_room_components(gray: np.ndarray) -> list[dict[str, float]]:
     return comps
 
 
-def _dedupe_tokens(tokens: list[dict[str, Any]], grid: int = 6) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    seen = set()
-    for t in tokens:
-        key = (
-            str(t.get("text", "")).upper(),
-            round(float(t.get("x", 0)) / grid),
-            round(float(t.get("y", 0)) / grid),
-            round(float(t.get("w", 0)) / grid),
-            round(float(t.get("h", 0)) / grid),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(t)
-    return out
+def run_ocr_text_extractors(image_path: Path) -> tuple[str, str]:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_best = executor.submit(extract_best_text, str(image_path))
+        future_simple = executor.submit(image_to_text, str(image_path))
+        return future_best.result(), future_simple.result()
 
 
-def _ocr_tokens_tesseract(image: np.ndarray, tessdata_dir: str | None = None) -> list[dict[str, Any]]:
-    try:
-        import pytesseract
-    except Exception:
-        return []
-
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray2x = cv2.resize(gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
-    blur = cv2.GaussianBlur(gray2x, (3, 3), 0)
-    _, otsu = cv2.threshold(gray2x, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    adap = cv2.adaptiveThreshold(
-        gray2x,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        31,
-        7,
-    )
-    inv = cv2.bitwise_not(gray2x)
-
-    cfg_base = "--oem 1"
-    if tessdata_dir:
-        cfg_base += f" --tessdata-dir {tessdata_dir}"
-
-    passes = [
-        (image, 1.0, cfg_base + " --psm 11"),
-        (image, 1.0, cfg_base + " --psm 6"),
-        (gray2x, 2.0, cfg_base + " --psm 11"),
-        (gray2x, 2.0, cfg_base + " --psm 6"),
-        (blur, 2.0, cfg_base + " --psm 6"),
-        (otsu, 2.0, cfg_base + " --psm 6"),
-        (adap, 2.0, cfg_base + " --psm 6"),
-        (inv, 2.0, cfg_base + " --psm 11"),
-    ]
-
-    out: list[dict[str, Any]] = []
-    for oimg, scale, cfg in passes:
-        data = None
-        for lang in ("eng", "osd", "eng+osd"):
-            try:
-                data = pytesseract.image_to_data(oimg, output_type=pytesseract.Output.DICT, config=cfg, lang=lang)
-                break
-            except Exception:
-                data = None
-        if data is None:
-            continue
-
-        for text, conf, x, y, w, h in zip(
-            data.get("text", []),
-            data.get("conf", []),
-            data.get("left", []),
-            data.get("top", []),
-            data.get("width", []),
-            data.get("height", []),
-        ):
-            t = (text or "").strip()
-            if not t:
-                continue
-            try:
-                c = float(conf)
-            except Exception:
-                c = -1
-            if c < 5:
-                continue
-            rx = int(round(int(x) / scale))
-            ry = int(round(int(y) / scale))
-            rw = int(round(int(w) / scale))
-            rh = int(round(int(h) / scale))
-            out.append({"text": t, "conf": c, "x": rx, "y": ry, "w": rw, "h": rh, "cx": rx + rw / 2.0, "cy": ry + rh / 2.0})
-
-    return _dedupe_tokens(out)
+def _to_feet(value: dict[str, Any]) -> float:
+    return float(value.get("feet", 0)) + (float(value.get("inches", 0)) / 12.0)
 
 
-def _ocr_tokens_easyocr(image: np.ndarray) -> list[dict[str, Any]]:
-    try:
-        import easyocr
-    except Exception:
-        return []
+def build_rooms_from_ocr_data(
+    parsed: dict[str, Any],
+    components: list[dict[str, float]],
+    mm_per_px: float,
+) -> list[dict[str, Any]]:
+    rooms: list[dict[str, Any]] = []
+    name_counter: dict[str, int] = {}
 
-    reader = easyocr.Reader(["en"], gpu=False)
-    # Preprocess: convert to grayscale and upscale 2x to improve small-text detection
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray2x = cv2.resize(gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
-    _easyocr_scale = 2.0
-    results = reader.readtext(gray2x, detail=1)
-    out: list[dict[str, Any]] = []
-    for item in results:
-        if len(item) != 3:
-            continue
-        box, text, conf = item
-        t = str(text or "").strip()
-        if not t:
-            continue
-        try:
-            c = float(conf) * 100.0
-        except Exception:
-            c = -1.0
-        if c < 5:
-            continue
-        # Scale bounding box coordinates back to original image space
-        xs = [float(pt[0]) / _easyocr_scale for pt in box]
-        ys = [float(pt[1]) / _easyocr_scale for pt in box]
-        x0, x1 = int(round(min(xs))), int(round(max(xs)))
-        y0, y1 = int(round(min(ys))), int(round(max(ys)))
-        w = max(1, x1 - x0)
-        h = max(1, y1 - y0)
-        out.append({"text": t, "conf": c, "x": x0, "y": y0, "w": w, "h": h, "cx": x0 + w / 2.0, "cy": y0 + h / 2.0})
+    parsed_rooms = list(parsed.get("rooms", []))
+    for idx, src in enumerate(parsed_rooms):
+        raw_name = str(src.get("raw_label") or src.get("name") or "ROOM").strip()
+        base = normalize_label_name(raw_name)
+        key = base.upper()
+        name_counter[key] = name_counter.get(key, 0) + 1
+        name = f"{base} {name_counter[key]}" if name_counter[key] > 1 else base
 
-    return _dedupe_tokens(out)
+        if components:
+            c = components[min(idx, len(components) - 1)]
+            footprint = {
+                "min_x": px_to_mm(c["x"], mm_per_px),
+                "min_y": px_to_mm(c["y"], mm_per_px),
+                "max_x": px_to_mm(c["x"] + c["w"], mm_per_px),
+                "max_y": px_to_mm(c["y"] + c["h"], mm_per_px),
+            }
+        else:
+            footprint = {"min_x": 0, "min_y": 0, "max_x": 1, "max_y": 1}
 
+        room: dict[str, Any] = {
+            "id": len(rooms) + 1,
+            "name": name,
+            "label_text": raw_name,
+            "footprint": footprint,
+        }
 
-def _ocr_tokens_paddle(image: np.ndarray) -> list[dict[str, Any]]:
-    try:
-        from paddleocr import PaddleOCR
-    except Exception:
-        return []
+        dims = src.get("dimensions")
+        if isinstance(dims, dict):
+            width = dims.get("width")
+            height = dims.get("height")
+            if isinstance(width, dict) and isinstance(height, dict):
+                room["dimensions_ft"] = {
+                    "length": round(_to_feet(width), 2),
+                    "width": round(_to_feet(height), 2),
+                }
 
-    try:
-        ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
-        results = ocr.ocr(image, cls=True)
-    except Exception:
-        return []
+        rooms.append(room)
 
-    out: list[dict[str, Any]] = []
-    for page in results or []:
-        for det in page or []:
-            if not isinstance(det, (list, tuple)) or len(det) != 2:
-                continue
-            box, rec = det
-            if not rec or len(rec) < 2:
-                continue
-            text = str(rec[0] or "").strip()
-            if not text:
-                continue
-            try:
-                c = float(rec[1]) * 100.0
-            except Exception:
-                c = -1.0
-            if c < 5:
-                continue
-            try:
-                xs = [float(pt[0]) for pt in box]
-                ys = [float(pt[1]) for pt in box]
-            except Exception:
-                continue
-            x0, x1 = int(round(min(xs))), int(round(max(xs)))
-            y0, y1 = int(round(min(ys))), int(round(max(ys)))
-            w = max(1, x1 - x0)
-            h = max(1, y1 - y0)
-            out.append({"text": text, "conf": c, "x": x0, "y": y0, "w": w, "h": h, "cx": x0 + w / 2.0, "cy": y0 + h / 2.0})
-
-    return _dedupe_tokens(out)
-
-
-def ocr_tokens(image: np.ndarray, tessdata_dir: str | None = None, engine: str = "paddle") -> list[dict[str, Any]]:
-    e = (engine or "paddle").strip().lower()
-    if e == "paddle":
-        t = _ocr_tokens_paddle(image)
-        if t:
-            return t
-        t = _ocr_tokens_easyocr(image)
-        if t:
-            return t
-        return _ocr_tokens_tesseract(image, tessdata_dir=tessdata_dir)
-    if e == "easyocr":
-        t = _ocr_tokens_easyocr(image)
-        if t:
-            return t
-        return _ocr_tokens_tesseract(image, tessdata_dir=tessdata_dir)
-    return _ocr_tokens_tesseract(image, tessdata_dir=tessdata_dir)
-
-
-def is_room_label_token(text: str) -> bool:
-    up = re.sub(r"[^A-Z]", "", text.upper())
-    if len(up) < 4:
-        return False
-    return any(k in up for k in ROOM_KEYWORDS)
+    return rooms
 
 
 def normalize_label_name(text: str) -> str:
@@ -379,109 +236,6 @@ def normalize_label_name(text: str) -> str:
     if "BALCONY" in up:
         return "BALCONY"
     return up if up else "ROOM"
-
-
-def parse_feet_inches_single(token: str) -> float | None:
-    t = token.upper().replace("\u201d", '"').replace("\u2032", "'").replace(" ", "")
-    t = t.replace("`", "'").replace("’", "'").replace("″", '"').replace("“", '"')
-    # OCR cleanup: 13'-6" -> 13'6", 9'-O" -> 9'0"
-    t = t.replace("'-", "'").replace("-'", "'")
-    t = t.replace("O", "0").replace("Q", "0").replace("D", "0")
-    t = t.replace("I", "1").replace("L", "1")
-    t = re.sub(r"[^0-9'\"]", "", t)
-
-    # 13'6" / 13'06" / 13'6
-    m = re.search(r"^(\d{1,2})'(\d{1,2})\"?$", t)
-    if m:
-        ft = int(m.group(1))
-        inch = int(m.group(2))
-        if 0 <= inch < 12:
-            return ft + (inch / 12.0)
-
-    # 13-6 / 13'6 (already cleaned)
-    m = re.search(r"^(\d{1,2})[-'](\d{1,2})\"?$", t)
-    if m:
-        ft = int(m.group(1))
-        inch = int(m.group(2))
-        if 0 <= inch < 12:
-            return ft + (inch / 12.0)
-
-    m = re.search(r"^(\d{2})$", t)
-    if m:
-        d = m.group(1)
-        ft = int(d[0])
-        inch = int(d[1])
-        if 0 <= inch < 12:
-            return ft + (inch / 12.0)
-
-    m = re.search(r"^(\d{1,2})\"?$", t)
-    if m:
-        ft = int(m.group(1))
-        if 3 <= ft <= 30:
-            return float(ft)
-
-    m = re.search(r"^(\d{1,2})'$", t)
-    if m:
-        ft = int(m.group(1))
-        if 3 <= ft <= 30:
-            return float(ft)
-
-    return None
-
-
-def parse_dimension_from_text(text: str) -> tuple[float, float] | None:
-    s = text.upper().replace(" ", "")
-    s = s.replace("\u00D7", "X").replace("*", "X").replace("/", "X")
-    s = s.replace("O", "0").replace("Q", "0").replace("D", "0")
-    s = s.replace("”", '"').replace("′", "'").replace("`", "'")
-    s = s.replace("'-", "'").replace("-'", "'")
-    # Common OCR misreads near inch markers.
-    s = re.sub(r"([0-9]')([A-Z]{1,2})(\")", r"\g<1>0\g<3>", s)
-    s = re.sub(r"([0-9]')([A-Z]{1,2})$", r"\g<1>0", s)
-
-    token = r"(?:\d{1,2}(?:['-]\d{1,2})?\"?|\d{1,2}'?)"
-    patterns = [
-        re.compile(rf"({token})X({token})"),
-        re.compile(r'([0-9\-\'\"]+)X([0-9\-\'\"]+)'),
-    ]
-
-    candidates: list[tuple[float, float]] = []
-    for pat in patterns:
-        for m in pat.finditer(s):
-            a = parse_feet_inches_single(m.group(1))
-            b = parse_feet_inches_single(m.group(2))
-            if a is None or b is None:
-                continue
-            if not (2.5 <= a <= 40 and 2.5 <= b <= 40):
-                continue
-            candidates.append((a, b))
-
-    if not candidates and "X" in s:
-        parts = [p for p in re.split(r"X+", s) if p]
-        for i in range(len(parts) - 1):
-            a = parse_feet_inches_single(parts[i])
-            b = parse_feet_inches_single(parts[i + 1])
-            if a is None or b is None:
-                continue
-            if not (2.5 <= a <= 40 and 2.5 <= b <= 40):
-                continue
-            candidates.append((a, b))
-
-    if not candidates:
-        return None
-
-    # Prefer realistic room dimensions and avoid huge OCR outliers.
-    def score(pair: tuple[float, float]) -> tuple[int, float]:
-        a, b = pair
-        mx = max(a, b)
-        realism = 0
-        if mx <= 25:
-            realism += 2
-        if min(a, b) >= 4:
-            realism += 1
-        return (realism, -(abs(a - b)))
-
-    return sorted(candidates, key=score, reverse=True)[0]
 
 
 def _bbox_iou_like(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
@@ -533,336 +287,7 @@ def filter_invalid_rooms(rooms: list[dict[str, Any]], min_side_mm: int = 120) ->
         r["id"] = i
     return out
 
-def merge_room_sets(primary: list[dict[str, Any]], secondary: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    Merge room candidates from multiple detectors.
-    Keeps primary first, then adds missing semantic labels from secondary.
-    """
-    out = list(primary)
-    existing_keys = set()
-    for r in out:
-        key = normalize_label_name(str(r.get("label_text", r.get("name", ""))))
-        existing_keys.add(key)
-
-    for r in secondary:
-        key = normalize_label_name(str(r.get("label_text", r.get("name", ""))))
-        # Add if label class missing entirely, or if this room has dimensions while
-        # existing class entries do not.
-        if key not in existing_keys:
-            out.append(r)
-            existing_keys.add(key)
-            continue
-        if r.get("dimensions_ft"):
-            has_dim_for_key = False
-            for ex in out:
-                ex_key = normalize_label_name(str(ex.get("label_text", ex.get("name", ""))))
-                if ex_key == key and ex.get("dimensions_ft"):
-                    has_dim_for_key = True
-                    break
-            if not has_dim_for_key:
-                out.append(r)
-
-    # Re-number IDs after merge.
-    for i, r in enumerate(out, 1):
-        r["id"] = i
-    return out
-
-
-def group_tokens_into_lines(tokens: list[dict[str, Any]], y_tol: int = 10) -> list[dict[str, Any]]:
-    if not tokens:
-        return []
-
-    ts = sorted(tokens, key=lambda t: (t["cy"], t["x"]))
-    groups: list[list[dict[str, Any]]] = []
-
-    for t in ts:
-        placed = False
-        for g in groups:
-            gy = sum(x["cy"] for x in g) / len(g)
-            if abs(t["cy"] - gy) <= y_tol:
-                g.append(t)
-                placed = True
-                break
-        if not placed:
-            groups.append([t])
-
-    lines: list[dict[str, Any]] = []
-    for g in groups:
-        g.sort(key=lambda x: x["x"])
-        text = " ".join(x["text"] for x in g)
-        x0 = min(x["x"] for x in g)
-        y0 = min(x["y"] for x in g)
-        x1 = max(x["x"] + x["w"] for x in g)
-        y1 = max(x["y"] + x["h"] for x in g)
-        lines.append({"text": text, "x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0, "cx": (x0 + x1) / 2.0, "cy": (y0 + y1) / 2.0})
-
-    lines.sort(key=lambda l: (l["y"], l["x"]))
-    return lines
-
-
-def _extract_dimension_near_label(tokens: list[dict[str, Any]], label: dict[str, Any]) -> tuple[float, float] | None:
-    # Adaptive search window: larger plans often place dimensions a bit farther
-    # under room labels.
-    x_pad_l = max(60, int(label.get("w", 0) * 1.1))
-    x_pad_r = max(260, int(label.get("w", 0) * 2.8))
-    y_pad_up = 40
-    y_pad_down = 220
-
-    near = []
-    for t in tokens:
-        if t["cy"] < label["cy"] - y_pad_up or t["cy"] > label["cy"] + y_pad_down:
-            continue
-        if t["x"] < label["x"] - x_pad_l or t["x"] > label["x"] + x_pad_r:
-            continue
-        near.append(t)
-
-    if not near:
-        return None
-
-    near.sort(key=lambda z: (z["y"], z["x"]))
-    near_lines = group_tokens_into_lines(near, y_tol=12)
-
-    # Candidate tuples: (dim_pair, cx, cy)
-    candidates: list[tuple[tuple[float, float], float, float]] = []
-
-    # 1) Text-window candidates.
-    texts = [t["text"] for t in near]
-    text_cands: list[tuple[str, float, float]] = []
-    for t in near:
-        text_cands.append((t["text"], t["cx"], t["cy"]))
-    for i in range(len(texts)):
-        for j in range(i + 1, min(len(texts), i + 5)):
-            merged = near[i : j + 1]
-            cx = float(sum(z["cx"] for z in merged) / len(merged))
-            cy = float(sum(z["cy"] for z in merged) / len(merged))
-            text_cands.append(("".join(texts[i : j + 1]), cx, cy))
-            text_cands.append((" ".join(texts[i : j + 1]), cx, cy))
-    for ln in near_lines:
-        text_cands.append((ln["text"], ln["cx"], ln["cy"]))
-
-    for c, cx, cy in text_cands:
-        d = parse_dimension_from_text(c)
-        if d is not None:
-            candidates.append((d, cx, cy))
-
-    # 2) Geometry candidates: nearest numeric tokens around an X separator.
-    by_line = group_tokens_into_lines(near, y_tol=9)
-    for ln in by_line:
-        ltoks = [t for t in near if abs(t["cy"] - ln["cy"]) <= 12 and t["x"] >= ln["x"] - 4 and t["x"] <= (ln["x"] + ln["w"] + 4)]
-        ltoks.sort(key=lambda z: z["x"])
-        if not ltoks:
-            continue
-        for x_tok in ltoks:
-            xu = re.sub(r"[^A-Z]", "", x_tok["text"].upper())
-            if "X" not in xu:
-                continue
-            left_num = None
-            right_num = None
-            best_left_dx = 1e9
-            best_right_dx = 1e9
-            for t in ltoks:
-                val = parse_feet_inches_single(t["text"])
-                if val is None:
-                    continue
-                dx = abs(t["cx"] - x_tok["cx"])
-                if t["cx"] < x_tok["cx"] and dx < best_left_dx:
-                    best_left_dx = dx
-                    left_num = (val, t)
-                if t["cx"] > x_tok["cx"] and dx < best_right_dx:
-                    best_right_dx = dx
-                    right_num = (val, t)
-            if left_num and right_num and best_left_dx <= 130 and best_right_dx <= 130:
-                d = (float(left_num[0]), float(right_num[0]))
-                cx = float((left_num[1]["cx"] + right_num[1]["cx"]) / 2.0)
-                cy = float((left_num[1]["cy"] + right_num[1]["cy"]) / 2.0)
-                candidates.append((d, cx, cy))
-
-    if not candidates:
-        return None
-
-    best = None
-    best_score = 1e9
-    for d, cx, cy in candidates:
-        dist = float(np.hypot((cx - label["cx"]) * 0.65, max(0.0, cy - label["cy"])))
-        label_name = normalize_label_name(label["text"])
-        penalty = 0.0
-        if label_name == "TOILET" and max(d[0], d[1]) > 9.5:
-            continue
-        if label_name != "TOILET" and min(d[0], d[1]) < 4.0:
-            continue
-        if max(d[0], d[1]) > 25:
-            penalty += 20.0
-        if min(d[0], d[1]) < 4.8:
-            penalty += 8.0
-        score = dist + penalty
-        if score < best_score:
-            best_score = score
-            best = d
-
-    return best
-
-
-def build_labeled_rooms(tokens: list[dict[str, Any]], components: list[dict[str, float]], mm_per_px: float) -> list[dict[str, Any]]:
-    labels = [t for t in tokens if is_room_label_token(t["text"])]
-    # De-dup similar nearby labels (multi-pass OCR duplicates).
-    dedup: list[dict[str, Any]] = []
-    for t in labels:
-        same = False
-        for e in dedup:
-            if normalize_label_name(e["text"]) != normalize_label_name(t["text"]):
-                continue
-            if abs(e["x"] - t["x"]) <= 20 and abs(e["y"] - t["y"]) <= 20:
-                same = True
-                break
-        if not same:
-            dedup.append(t)
-    labels = dedup
-
-    rooms: list[dict[str, Any]] = []
-    used_comp = set()
-    name_counter: dict[str, int] = {}
-
-    # First pass: component-based matching
-    for lb in labels:
-        best_dim = _extract_dimension_near_label(tokens, lb)
-
-        best_comp_idx = None
-        best_cd = 1e9
-        for idx, c in enumerate(components):
-            if idx in used_comp:
-                continue
-            cd = float(np.hypot(c["cx"] - lb["cx"], c["cy"] - lb["cy"]))
-            if cd < best_cd:
-                best_cd = cd
-                best_comp_idx = idx
-
-        if best_comp_idx is None:
-            continue
-        used_comp.add(best_comp_idx)
-        c = components[best_comp_idx]
-
-        raw_name = lb["text"].strip()
-        base = normalize_label_name(raw_name)
-        k = base.upper()
-        name_counter[k] = name_counter.get(k, 0) + 1
-        name = f"{base} {name_counter[k]}" if name_counter[k] > 1 else base
-
-        room: dict[str, Any] = {
-            "id": len(rooms) + 1,
-            "name": name,
-            "label_text": raw_name,
-            "footprint": {
-                "min_x": px_to_mm(c["x"], mm_per_px),
-                "min_y": px_to_mm(c["y"], mm_per_px),
-                "max_x": px_to_mm(c["x"] + c["w"], mm_per_px),
-                "max_y": px_to_mm(c["y"] + c["h"], mm_per_px),
-            },
-        }
-
-        if best_dim is not None:
-            room["dimensions_ft"] = {"length": round(best_dim[0], 2), "width": round(best_dim[1], 2)}
-
-        rooms.append(room)
-
-
-    return rooms
-
-
-def build_labeled_rooms_from_lines(
-    tokens: list[dict[str, Any]],
-    merged_lines: list[dict[str, float]],
-    left: float,
-    right: float,
-    top: float,
-    bottom: float,
-    mm_per_px: float,
-) -> list[dict[str, Any]]:
-    labels = [t for t in tokens if is_room_label_token(t["text"])]
-    dedup: list[dict[str, Any]] = []
-    for t in labels:
-        same = False
-        for e in dedup:
-            if normalize_label_name(e["text"]) != normalize_label_name(t["text"]):
-                continue
-            if abs(e["x"] - t["x"]) <= 20 and abs(e["y"] - t["y"]) <= 20:
-                same = True
-                break
-        if not same:
-            dedup.append(t)
-    labels = dedup
-
-    rooms: list[dict[str, Any]] = []
-    name_counter: dict[str, int] = {}
-
-    for lb in labels:
-        x = lb["cx"]
-        y = lb["cy"]
-
-        v_hits = [l for l in merged_lines if l["ori"] == "v" and (l["a0"] - 8) <= y <= (l["a1"] + 8)]
-        h_hits = [l for l in merged_lines if l["ori"] == "h" and (l["a0"] - 8) <= x <= (l["a1"] + 8)]
-
-        l_candidates = [left] + [v["coord"] for v in v_hits if v["coord"] < x - 2]
-        r_candidates = [right] + [v["coord"] for v in v_hits if v["coord"] > x + 2]
-        t_candidates = [top] + [h["coord"] for h in h_hits if h["coord"] < y - 2]
-        b_candidates = [bottom] + [h["coord"] for h in h_hits if h["coord"] > y + 2]
-
-        lx = max(l_candidates) if l_candidates else left
-        rx = min(r_candidates) if r_candidates else right
-        ty = max(t_candidates) if t_candidates else top
-        by = min(b_candidates) if b_candidates else bottom
-
-        if rx - lx < 25 or by - ty < 25:
-            # fallback small box around label
-            lx = max(left, x - 80)
-            rx = min(right, x + 80)
-            ty = max(top, y - 60)
-            by = min(bottom, y + 60)
-
-        base = normalize_label_name(lb["text"])
-        k = base.upper()
-        name_counter[k] = name_counter.get(k, 0) + 1
-        name = f"{base} {name_counter[k]}" if name_counter[k] > 1 else base
-
-        room = {
-            "id": len(rooms) + 1,
-            "name": name,
-            "label_text": lb["text"],
-            "footprint": {
-                "min_x": px_to_mm(lx - left, mm_per_px),
-                "max_x": px_to_mm(rx - left, mm_per_px),
-                "min_y": px_to_mm(bottom - by, mm_per_px),
-                "max_y": px_to_mm(bottom - ty, mm_per_px),
-            },
-        }
-
-        d = _extract_dimension_near_label(tokens, lb)
-        if d is not None:
-            room["dimensions_ft"] = {"length": round(d[0], 2), "width": round(d[1], 2)}
-
-        rooms.append(room)
-
-    # de-dup identical footprints
-    cleaned: list[dict[str, Any]] = []
-    for r in rooms:
-        fp = r["footprint"]
-        dup = False
-        for e in cleaned:
-            ef = e["footprint"]
-            if (
-                abs(fp["min_x"] - ef["min_x"]) <= 40
-                and abs(fp["max_x"] - ef["max_x"]) <= 40
-                and abs(fp["min_y"] - ef["min_y"]) <= 40
-                and abs(fp["max_y"] - ef["max_y"]) <= 40
-                and normalize_label_name(r["label_text"]) == normalize_label_name(e["label_text"])
-            ):
-                dup = True
-                break
-        if not dup:
-            cleaned.append(r)
-    return cleaned
-
-
-def calibrate_mm_per_px_from_rooms(rooms: list[dict[str, Any]], components: list[dict[str, float]], fallback: float) -> float:
+def calibrate_mm_per_px_from_rooms(rooms: list[dict[str, Any]], fallback: float) -> float:
     if not rooms:
         return fallback
 
@@ -1692,9 +1117,7 @@ Do not invent dimensions.
 def extract_floorplan(
     image_path: Path,
     mm_per_px: float | None,
-    tessdata_dir: str | None,
     auto_scale: bool = False,
-    ocr_engine: str = "paddle",
 ) -> dict[str, Any]:
     img = cv2.imread(str(image_path))
     if img is None:
@@ -1707,25 +1130,25 @@ def extract_floorplan(
     left, right, top, bottom = detect_outer_frame(merged_lines, w, h)
 
     components = detect_room_components(gray)
-    tokens = ocr_tokens(img, tessdata_dir=tessdata_dir, engine=ocr_engine)
+    best_text, simple_text = run_ocr_text_extractors(image_path)
+    ocr_data = organize_floor_data(best_text, simple_text)
+    tokens: list[dict[str, Any]] = []
 
     # First pass with default/fixed scale for provisional room footprints.
     base_scale = mm_per_px if mm_per_px is not None else DEFAULT_MM_PER_PX
-    provisional_rooms = build_labeled_rooms(tokens, components, base_scale)
+    provisional_rooms = build_rooms_from_ocr_data(ocr_data, components, base_scale)
 
     # Optional auto-calibration from OCR dimensions.
     if mm_per_px is None and auto_scale:
-        mm_per_px = calibrate_mm_per_px_from_rooms(provisional_rooms, components, base_scale)
+        mm_per_px = calibrate_mm_per_px_from_rooms(provisional_rooms, base_scale)
     elif mm_per_px is None:
         mm_per_px = base_scale
 
     room_len_mm = max(1, px_to_mm(right - left, mm_per_px))
     room_wid_mm = max(1, px_to_mm(bottom - top, mm_per_px))
 
-    # Rebuild rooms with final scale. Combine both detectors to reduce misses.
-    rooms_comp = build_labeled_rooms(tokens, components, mm_per_px)
-    rooms_line = build_labeled_rooms_from_lines(tokens, merged_lines, left, right, top, bottom, mm_per_px)
-    rooms = merge_room_sets(rooms_comp, rooms_line) if rooms_comp else rooms_line
+    # Rebuild rooms with final scale from OCR text parsed by ocr/extract.py.
+    rooms = build_rooms_from_ocr_data(ocr_data, components, mm_per_px)
     clamp_rooms_to_space(rooms, room_len_mm, room_wid_mm)
     rooms = filter_invalid_rooms(rooms)
 
@@ -1804,7 +1227,7 @@ def extract_floorplan(
             "ocr_tokens": len(tokens),
             "detected_room_labels": len(rooms),
             "detected_objects": len(objects),
-            "ocr_engine": ocr_engine,
+            "ocr_engine": "ocr/extract.py",
         },
     }
     return state
@@ -1906,8 +1329,6 @@ def main() -> None:
     parser.add_argument("--svg-out", default="final.svg", help="Output SVG file")
     parser.add_argument("--mm-per-px", type=float, default=None, help="Scale override (mm per pixel)")
     parser.add_argument("--auto-scale", action="store_true", help="Enable OCR-based mm/px auto calibration")
-    parser.add_argument("--tessdata-dir", default=None, help="Custom tessdata directory for OCR")
-    parser.add_argument("--ocr-engine", default="paddle", choices=["paddle", "easyocr", "tesseract"], help="OCR engine for text extraction")
     parser.add_argument("--use-ai", action="store_true", help="Use DSPy + Gemini refinement")
     parser.add_argument("--gemini-model", default="gemini/gemini-2.5-flash", help="DSPy model name")
     parser.add_argument("--force-ai-objects", action="store_true", help="Force Gemini vision on unknown objects")
@@ -1940,9 +1361,7 @@ def main() -> None:
         state = extract_floorplan(
             Path(args.image),
             mm_per_px=args.mm_per_px,
-            tessdata_dir=args.tessdata_dir,
             auto_scale=args.auto_scale,
-            ocr_engine=args.ocr_engine,
         )
 
     ai_meta: dict[str, Any] = {"enabled": False}
