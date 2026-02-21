@@ -1,0 +1,117 @@
+[
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1100Columbia_Floorplan_Images_Hackney.png",
+    "length": 12.10,
+    "bredth": 22.2,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1538392373_Shree_Sai_Iscon_Heights_3_BHK_Floor_Plan.jpeg",
+    "length": 9.10,
+    "bredth": 10.6,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/15421073700_Sobha_Garnet_3.jpeg",
+    "length": 9.2,
+    "bredth": 12.2,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1542107700_Sobha_Garnet_3.jpeg",
+    "length": 9.2,
+    "bredth": 12.2,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1559370530_Dwarkadhish_Casa_Romana_3_BHk_Floor_Plan.jpeg",
+    "length": 7.11,
+    "bredth": 11.2,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1578116618_rah_2bhk1.jpeg",
+    "length": 10.0,
+    "bredth": 7.7,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/1578116618_rah_3bhk1.jpeg",
+    "length": 10.6,
+    "bredth": 8.6,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/28651-364617-770x400.jpg",
+    "length": 7.8,
+    "bredth": 10,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/28651-64890-floor-plan-770x400.jpg",
+    "length": 7.8,
+    "bredth": 10,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/C1.jpg",
+    "length": 9.4,
+    "bredth": 7.3,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/Jupiter-Commanders-Glory-1010sqft-floor-plan.jpg",
+    "length": 10.0,
+    "bredth": 9,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/What-is-a-floor-plan-with-dimensions.png",
+    "length": null,
+    "bredth": null,
+    "area": "85",
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/example-floor-plan.jpg",
+    "length": null,
+    "bredth": null,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/f1a811641c63c0e7efd435db7fb7816c.jpg",
+    "length": 10,
+    "bredth": 9,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/floor.png",
+    "length": 8.0,
+    "bredth": 10,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/floor2.png",
+    "length": 6.6,
+    "bredth": 6.0,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/floor4.jpg",
+    "length": 13.6,
+    "bredth": 10,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/floor5.jpg",
+    "length": 9.4,
+    "bredth": 7.3,
+    "unit": "feet"
+  },
+  {
+    "image_path": "/home/rohit/Desktop/work/floor_images/sattva3-forest-ridge-3-bhk-apartment-floor-plan.webp",
+    "length": 11.11,
+    "bredth": 8,
+    "unit": "feet"
+  }
+]
