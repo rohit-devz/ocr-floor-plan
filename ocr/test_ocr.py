@@ -1,4 +1,5 @@
 import html
+import json
 import subprocess
 import sys
 import time
@@ -8,6 +9,15 @@ from pathlib import Path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 REPORT_FILE = "ocr_test_report.html"
+REPORT_JSON_FILE = "ocr_test_report.json"
+
+
+def build_output_text(entry: dict) -> str:
+    output = f'{entry["stdout"]}{entry["stderr"]}'
+    if entry["returncode"] != 0:
+        output += f"\n[exit code: {entry['returncode']}]"
+    output += f"\n[time: {entry['elapsed']:.3f}s]"
+    return output
 
 
 def write_html_report(report_path: Path, floor_dir: Path, entries: list[dict]) -> None:
@@ -15,10 +25,7 @@ def write_html_report(report_path: Path, floor_dir: Path, entries: list[dict]) -
     for index, entry in enumerate(entries, start=1):
         image_path = entry["image_path"]
         image_href = image_path.resolve().as_uri()
-        output = f'{entry["stdout"]}{entry["stderr"]}'
-        if entry["returncode"] != 0:
-            output += f"\n[exit code: {entry['returncode']}]"
-        output += f"\n[time: {entry['elapsed']:.3f}s]"
+        output = build_output_text(entry)
         rows.append(
             (
                 "<tr>"
@@ -75,15 +82,39 @@ def write_html_report(report_path: Path, floor_dir: Path, entries: list[dict]) -
     report_path.write_text(report_html, encoding="utf-8")
 
 
+def write_json_report(report_path: Path, floor_dir: Path, entries: list[dict]) -> None:
+    report_data = {
+        "source_directory": str(floor_dir),
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "completed_tests": len(entries),
+        "entries": [
+            {
+                "index": index,
+                "completed_at": entry["completed_at"],
+                "image_path": str(entry["image_path"]),
+                "command": entry["command"],
+                "exit_code": entry["returncode"],
+                "duration_seconds": round(entry["elapsed"], 3),
+                "output": build_output_text(entry),
+            }
+            for index, entry in enumerate(entries, start=1)
+        ],
+    }
+    report_path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     script_dir = Path(__file__).resolve().parent
     floor_dir = (script_dir / ".." / "floor").resolve()
     floor_dir = Path("/home/rohit/Desktop/work/floor_images")
     report_path = script_dir / REPORT_FILE
+    report_json_path = script_dir / REPORT_JSON_FILE
     entries: list[dict] = []
 
     write_html_report(report_path, floor_dir, entries)
+    write_json_report(report_json_path, floor_dir, entries)
     print(f"HTML report: {report_path}")
+    print(f"JSON report: {report_json_path}")
 
     if not floor_dir.is_dir():
         print(f"Floor directory not found: {floor_dir}")
@@ -129,6 +160,7 @@ def main() -> int:
             }
         )
         write_html_report(report_path, floor_dir, entries)
+        write_json_report(report_json_path, floor_dir, entries)
 
     return 0
 

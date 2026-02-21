@@ -1,0 +1,241 @@
+{
+  "source_directory": "/home/rohit/Desktop/work/floor_images",
+  "last_updated": "2026-02-21 11:15:07",
+  "completed_tests": 26,
+  "entries": [
+    {
+      "index": 1,
+      "completed_at": "2026-02-21 11:11:47",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1100Columbia_Floorplan_Images_Hackney.png",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1100Columbia_Floorplan_Images_Hackney.png",
+      "exit_code": 0,
+      "duration_seconds": 8.223,
+      "output": "**********1**********\n**********2**********\nLIVING | KITCHEN | DINING None\nLIVING | KITCHEN | DINING {'width': {'feet': 10, 'inches': 0}, 'height': {'feet': 22, 'inches': 0}}\n\n[time: 8.223s]"
+    },
+    {
+      "index": 2,
+      "completed_at": "2026-02-21 11:11:51",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1538392373_Shree_Sai_Iscon_Heights_3_BHK_Floor_Plan.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1538392373_Shree_Sai_Iscon_Heights_3_BHK_Floor_Plan.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 3.894,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 91, 'inches': 0}, 'height': {'feet': 10, 'inches': 6}}\n\n[time: 3.894s]"
+    },
+    {
+      "index": 3,
+      "completed_at": "2026-02-21 11:11:54",
+      "image_path": "/home/rohit/Desktop/work/floor_images/15421073700_Sobha_Garnet_3.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/15421073700_Sobha_Garnet_3.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 3.55,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 9, 'inches': 2}, 'height': {'feet': 12, 'inches': 2}}\n\n[time: 3.550s]"
+    },
+    {
+      "index": 4,
+      "completed_at": "2026-02-21 11:11:58",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1542107700_Sobha_Garnet_3.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1542107700_Sobha_Garnet_3.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 3.596,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 9, 'inches': 2}, 'height': {'feet': 12, 'inches': 2}}\n\n[time: 3.596s]"
+    },
+    {
+      "index": 5,
+      "completed_at": "2026-02-21 11:12:02",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1559370530_Dwarkadhish_Casa_Romana_3_BHk_Floor_Plan.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1559370530_Dwarkadhish_Casa_Romana_3_BHk_Floor_Plan.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 4.233,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN None\n\n[time: 4.233s]"
+    },
+    {
+      "index": 6,
+      "completed_at": "2026-02-21 11:12:06",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1578116618_rah_2bhk1.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1578116618_rah_2bhk1.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 3.463,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 10, 'inches': 0}, 'height': {'feet': 7, 'inches': 7}}\nKITCHEN - {'width': {'feet': 10, 'inches': 0}, 'height': {'feet': 7, 'inches': 7}}\n\n[time: 3.463s]"
+    },
+    {
+      "index": 7,
+      "completed_at": "2026-02-21 11:12:10",
+      "image_path": "/home/rohit/Desktop/work/floor_images/1578116618_rah_3bhk1.jpeg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/1578116618_rah_3bhk1.jpeg",
+      "exit_code": 0,
+      "duration_seconds": 4.037,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 57, 'inches': 7}, 'height': {'feet': 8, 'inches': 6}}\nKITCHEN {'width': {'feet': 10, 'inches': 6}, 'height': {'feet': 8, 'inches': 6}}\n\n[time: 4.037s]"
+    },
+    {
+      "index": 8,
+      "completed_at": "2026-02-21 11:12:14",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-364617-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-364617-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 3.827,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN None\n\n[time: 3.827s]"
+    },
+    {
+      "index": 9,
+      "completed_at": "2026-02-21 11:12:17",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-364618-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-364618-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 3.179,
+      "output": "**********1**********\n**********2**********\n\n[time: 3.179s]"
+    },
+    {
+      "index": 10,
+      "completed_at": "2026-02-21 11:12:20",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-364619-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-364619-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 2.826,
+      "output": "**********1**********\n**********2**********\n\n[time: 2.826s]"
+    },
+    {
+      "index": 11,
+      "completed_at": "2026-02-21 11:12:23",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-364620-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-364620-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 2.982,
+      "output": "**********1**********\n**********2**********\n\n[time: 2.982s]"
+    },
+    {
+      "index": 12,
+      "completed_at": "2026-02-21 11:12:26",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-64890-floor-plan-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-64890-floor-plan-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 3.894,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN None\n\n[time: 3.894s]"
+    },
+    {
+      "index": 13,
+      "completed_at": "2026-02-21 11:12:30",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-64891-floor-plan-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-64891-floor-plan-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 3.268,
+      "output": "**********1**********\n**********2**********\n\n[time: 3.268s]"
+    },
+    {
+      "index": 14,
+      "completed_at": "2026-02-21 11:12:33",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-64892-floor-plan-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-64892-floor-plan-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 2.995,
+      "output": "**********1**********\n**********2**********\n\n[time: 2.995s]"
+    },
+    {
+      "index": 15,
+      "completed_at": "2026-02-21 11:12:36",
+      "image_path": "/home/rohit/Desktop/work/floor_images/28651-64893-floor-plan-770x400.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/28651-64893-floor-plan-770x400.jpg",
+      "exit_code": 0,
+      "duration_seconds": 3.143,
+      "output": "**********1**********\n**********2**********\n\n[time: 3.143s]"
+    },
+    {
+      "index": 16,
+      "completed_at": "2026-02-21 11:13:18",
+      "image_path": "/home/rohit/Desktop/work/floor_images/C1.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/C1.jpg",
+      "exit_code": 0,
+      "duration_seconds": 42.101,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 9, 'inches': 4}, 'height': {'feet': 7, 'inches': 3}}\n\n[time: 42.101s]"
+    },
+    {
+      "index": 17,
+      "completed_at": "2026-02-21 11:13:21",
+      "image_path": "/home/rohit/Desktop/work/floor_images/Jupiter-Commanders-Glory-1010sqft-floor-plan.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/Jupiter-Commanders-Glory-1010sqft-floor-plan.jpg",
+      "exit_code": 0,
+      "duration_seconds": 2.766,
+      "output": "**********1**********\n**********2**********\nKITCHEN 103116\" None\n\"Z| KITCHEN {'width': {'feet': 10, 'inches': 0}, 'height': {'feet': 9, 'inches': 0}}\n\n[time: 2.766s]"
+    },
+    {
+      "index": 18,
+      "completed_at": "2026-02-21 11:13:27",
+      "image_path": "/home/rohit/Desktop/work/floor_images/What-is-a-floor-plan-with-dimensions.png",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/What-is-a-floor-plan-with-dimensions.png",
+      "exit_code": 0,
+      "duration_seconds": 5.828,
+      "output": "**********1**********\n**********2**********\n1 72SQFT 48 SQ FT KITCHEN 5% None\n\n[time: 5.828s]"
+    },
+    {
+      "index": 19,
+      "completed_at": "2026-02-21 11:13:42",
+      "image_path": "/home/rohit/Desktop/work/floor_images/example-floor-plan.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/example-floor-plan.jpg",
+      "exit_code": 0,
+      "duration_seconds": 15.828,
+      "output": "**********1**********\n**********2**********\nKITCHEN EEL None\n\n[time: 15.828s]"
+    },
+    {
+      "index": 20,
+      "completed_at": "2026-02-21 11:13:49",
+      "image_path": "/home/rohit/Desktop/work/floor_images/f1a811641c63c0e7efd435db7fb7816c.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/f1a811641c63c0e7efd435db7fb7816c.jpg",
+      "exit_code": 0,
+      "duration_seconds": 7.009,
+      "output": "**********1**********\n**********2**********\n| EE JOD KITCHEN None\n\n[time: 7.009s]"
+    },
+    {
+      "index": 21,
+      "completed_at": "2026-02-21 11:13:56",
+      "image_path": "/home/rohit/Desktop/work/floor_images/floor.png",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/floor.png",
+      "exit_code": 0,
+      "duration_seconds": 6.816,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 8, 'inches': 0}, 'height': {'feet': 10, 'inches': 0}}\nKITCHEN {'width': {'feet': 8, 'inches': 0}, 'height': {'feet': 10, 'inches': 0}}\n\n[time: 6.816s]"
+    },
+    {
+      "index": 22,
+      "completed_at": "2026-02-21 11:14:01",
+      "image_path": "/home/rohit/Desktop/work/floor_images/floor2.png",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/floor2.png",
+      "exit_code": 0,
+      "duration_seconds": 4.947,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 6, 'inches': 0}, 'height': {'feet': 6, 'inches': 0}}\n\n[time: 4.947s]"
+    },
+    {
+      "index": 23,
+      "completed_at": "2026-02-21 11:14:16",
+      "image_path": "/home/rohit/Desktop/work/floor_images/floor4.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/floor4.jpg",
+      "exit_code": 0,
+      "duration_seconds": 15.14,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 6, 'inches': 0}, 'height': {'feet': 10, 'inches': 0}}\n& OO KITCHEN 1 {'width': {'feet': 6, 'inches': 0}, 'height': {'feet': 10, 'inches': 0}}\n\n[time: 15.140s]"
+    },
+    {
+      "index": 24,
+      "completed_at": "2026-02-21 11:15:01",
+      "image_path": "/home/rohit/Desktop/work/floor_images/floor5.jpg",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/floor5.jpg",
+      "exit_code": 0,
+      "duration_seconds": 44.534,
+      "output": "**********1**********\n**********2**********\nKITCHEN None\nKITCHEN {'width': {'feet': 9, 'inches': 4}, 'height': {'feet': 7, 'inches': 3}}\n\n[time: 44.534s]"
+    },
+    {
+      "index": 25,
+      "completed_at": "2026-02-21 11:15:04",
+      "image_path": "/home/rohit/Desktop/work/floor_images/sattva-forest-ridge-3-bhk-apartment-floor-plan.webp",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/sattva-forest-ridge-3-bhk-apartment-floor-plan.webp",
+      "exit_code": 0,
+      "duration_seconds": 2.988,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 59, 'inches': 0}, 'height': {'feet': 63, 'inches': 0}}\n\n[time: 2.988s]"
+    },
+    {
+      "index": 26,
+      "completed_at": "2026-02-21 11:15:07",
+      "image_path": "/home/rohit/Desktop/work/floor_images/sattva3-forest-ridge-3-bhk-apartment-floor-plan.webp",
+      "command": "py ocr.py /home/rohit/Desktop/work/floor_images/sattva3-forest-ridge-3-bhk-apartment-floor-plan.webp",
+      "exit_code": 0,
+      "duration_seconds": 2.936,
+      "output": "**********1**********\n**********2**********\nKITCHEN {'width': {'feet': 59, 'inches': 0}, 'height': {'feet': 63, 'inches': 0}}\n\n[time: 2.936s]"
+    }
+  ]
+}
